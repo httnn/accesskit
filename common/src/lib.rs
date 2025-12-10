@@ -791,6 +791,7 @@ enum PropertyId {
     // String
     Label,
     Description,
+    ValueDescription,
     Value,
     AccessKey,
     AuthorId,
@@ -1739,6 +1740,7 @@ string_property_methods! {
     /// should be provided via [`Node::value`], not this property.
     (Label, label, set_label, clear_label),
     (Description, description, set_description, clear_description),
+    (ValueDescription, value_description, set_value_description, clear_value_description),
     (Value, value, set_value, clear_value),
     /// A single character, usually part of this node's name, that can be pressed,
     /// possibly along with a platform-specific modifier, to perform

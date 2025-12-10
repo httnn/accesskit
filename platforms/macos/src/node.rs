@@ -534,6 +534,7 @@ declare_class!(
 
         #[method_id(accessibilityValue)]
         fn value(&self) -> Option<Id<NSObject>> {
+            println!("get accessibility value");
             self.resolve(|node| {
                 let wrapper = NodeWrapper(node);
                 wrapper.value().map(|value| match value {
@@ -551,8 +552,16 @@ declare_class!(
             .flatten()
         }
 
+        #[method_id(accessibilityValueDescription)]
+        fn value_description(&self) -> Option<Id<NSObject>> {
+            self.resolve(|node| {
+                node.value_description().map(|v| Id::into_super(NSString::from_str(&v)))
+            }).flatten()
+        }
+
         #[method(setAccessibilityValue:)]
         fn set_value(&self, value: &NSObject) {
+            println!("setAccessibilityValue:");
             if let Some(string) = downcast_ref::<NSString>(value) {
                 self.resolve_with_context(|node, context| {
                     context.do_action(ActionRequest {
@@ -659,6 +668,7 @@ declare_class!(
 
         #[method(accessibilityPerformIncrement)]
         fn increment(&self) -> bool {
+            println!("accessibilityPerformIncrement:");
             self.resolve_with_context(|node, context| {
                 let supports_increment = node.supports_increment(&filter);
                 if supports_increment {
@@ -675,6 +685,7 @@ declare_class!(
 
         #[method(accessibilityPerformDecrement)]
         fn decrement(&self) -> bool {
+            println!("accessibilityPerformDecrement:");
             self.resolve_with_context(|node, context| {
                 let supports_decrement = node.supports_decrement(&filter);
                 if supports_decrement {
@@ -1109,6 +1120,7 @@ declare_class!(
                     || selector == sel!(accessibilityHelp)
                     || selector == sel!(accessibilityPlaceholderValue)
                     || selector == sel!(accessibilityValue)
+                    || selector == sel!(accessibilityValueDescription)
                     || selector == sel!(accessibilityMinValue)
                     || selector == sel!(accessibilityMaxValue)
                     || selector == sel!(isAccessibilityRequired)

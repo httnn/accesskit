@@ -681,6 +681,12 @@ impl<'a> Node<'a> {
             .map(|description| description.to_string())
     }
 
+    pub fn value_description(&self) -> Option<String> {
+        self.data()
+            .value_description()
+            .map(|description| description.to_string())
+    }
+
     fn is_empty_text_input(&self) -> bool {
         let mut text_runs = self.text_runs();
         if let Some(first_text_run) = text_runs.next() {

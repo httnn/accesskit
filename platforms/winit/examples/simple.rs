@@ -1,7 +1,9 @@
 #[path = "util/fill.rs"]
 mod fill;
 
-use accesskit::{Action, ActionRequest, Live, Node, NodeId, Rect, Role, Tree, TreeUpdate};
+use accesskit::{
+    Action, ActionData, ActionRequest, Live, Node, NodeId, Rect, Role, Tree, TreeUpdate,
+};
 use accesskit_winit::{Adapter, Event as AccessKitEvent, WindowEvent as AccessKitWindowEvent};
 use std::error::Error;
 use winit::{
@@ -18,6 +20,7 @@ const WINDOW_ID: NodeId = NodeId(0);
 const BUTTON_1_ID: NodeId = NodeId(1);
 const BUTTON_2_ID: NodeId = NodeId(2);
 const ANNOUNCEMENT_ID: NodeId = NodeId(3);
+const SLIDER_ID: NodeId = NodeId(4);
 const INITIAL_FOCUS: NodeId = BUTTON_1_ID;
 
 const BUTTON_1_RECT: Rect = Rect {
@@ -49,6 +52,25 @@ fn build_button(id: NodeId, label: &str) -> Node {
     node
 }
 
+fn build_slider(value: f32) -> Node {
+    let mut node = Node::new(Role::Slider);
+    node.set_bounds(Rect {
+        x0: 100.0,
+        y0: 100.0,
+        x1: 200.0,
+        y1: 200.0,
+    });
+    node.set_label("knob");
+    node.set_value_description(format!("{value} Hz"));
+    node.set_numeric_value(value as f64);
+    node.set_min_numeric_value(0.0);
+    node.set_max_numeric_value(200.0);
+    node.add_action(Action::Increment);
+    node.add_action(Action::Decrement);
+    node.add_action(Action::SetValue);
+    node
+}
+
 fn build_announcement(text: &str) -> Node {
     let mut node = Node::new(Role::Label);
     node.set_value(text);
@@ -58,6 +80,7 @@ fn build_announcement(text: &str) -> Node {
 
 struct UiState {
     focus: NodeId,
+    slider_value: f32,
     announcement: Option<String>,
 }
 
@@ -65,13 +88,14 @@ impl UiState {
     fn new() -> Self {
         Self {
             focus: INITIAL_FOCUS,
+            slider_value: 0.0,
             announcement: None,
         }
     }
 
     fn build_root(&mut self) -> Node {
         let mut node = Node::new(Role::Window);
-        node.set_children(vec![BUTTON_1_ID, BUTTON_2_ID]);
+        node.set_children(vec![BUTTON_1_ID, BUTTON_2_ID, SLIDER_ID]);
         if self.announcement.is_some() {
             node.push_child(ANNOUNCEMENT_ID);
         }
@@ -83,12 +107,14 @@ impl UiState {
         let root = self.build_root();
         let button_1 = build_button(BUTTON_1_ID, "Button 1");
         let button_2 = build_button(BUTTON_2_ID, "Button 2");
+        let slider = build_slider(self.slider_value);
         let tree = Tree::new(WINDOW_ID);
         let mut result = TreeUpdate {
             nodes: vec![
                 (WINDOW_ID, root),
                 (BUTTON_1_ID, button_1),
                 (BUTTON_2_ID, button_2),
+                (SLIDER_ID, slider),
             ],
             tree: Some(tree),
             focus: self.focus,
@@ -99,6 +125,15 @@ impl UiState {
                 .push((ANNOUNCEMENT_ID, build_announcement(announcement)));
         }
         result
+    }
+
+    fn set_slider_value(&mut self, v: f32, adapter: &mut Adapter) {
+        self.slider_value = v;
+        adapter.update_if_active(|| TreeUpdate {
+            nodes: vec![(SLIDER_ID, build_slider(self.slider_value))],
+            tree: None,
+            focus: self.focus,
+        });
     }
 
     fn set_focus(&mut self, adapter: &mut Adapter, focus: NodeId) {
@@ -194,6 +229,15 @@ impl ApplicationHandler<AccessKitEvent> for Application {
             WindowEvent::RedrawRequested => {
                 fill::fill_window(&window.window);
             }
+            WindowEvent::MouseInput {
+                device_id,
+                state: button_state,
+                button,
+            } => {
+                if button_state.is_pressed() {
+                    state.set_focus(adapter, BUTTON_2_ID);
+                }
+            }
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {
@@ -235,7 +279,11 @@ impl ApplicationHandler<AccessKitEvent> for Application {
             AccessKitWindowEvent::InitialTreeRequested => {
                 adapter.update_if_active(|| state.build_initial_tree());
             }
-            AccessKitWindowEvent::ActionRequested(ActionRequest { action, target, .. }) => {
+            AccessKitWindowEvent::ActionRequested(ActionRequest {
+                action,
+                target,
+                data,
+            }) => {
                 if target == BUTTON_1_ID || target == BUTTON_2_ID {
                     match action {
                         Action::Focus => {
@@ -245,6 +293,23 @@ impl ApplicationHandler<AccessKitEvent> for Application {
                             state.press_button(adapter, target);
                         }
                         _ => (),
+                    }
+                }
+                if target == SLIDER_ID {
+                    match action {
+                        Action::Increment => {
+                            println!("increment: {:?}", data);
+                        }
+                        Action::Decrement => {
+                            println!("decrement: {:?}", data);
+                        }
+                        Action::SetValue => {
+                            if let Some(ActionData::NumericValue(v)) = data {
+                                state.set_slider_value(v as f32, adapter);
+                            }
+                            println!("set value: {:?}", data);
+                        }
+                        _ => {}
                     }
                 }
                 window.window.request_redraw();
